@@ -1605,11 +1605,18 @@ export const EVENTS = [
         text: 'Approve it immediately, cost be damned',
         outcome: 'The surgery went well. Worth every cent.',
         effects: { cash: -4000, happiness: 8, relationships: 3 },
+        requirements: { minCash: 4500 },
       },
       {
         text: 'Ask for the more conservative, cheaper option',
         outcome: 'A harder recovery, but a good outcome in the end.',
         effects: { cash: -1200, happiness: -2 },
+        requirements: { minCash: 1400 },
+      },
+      {
+        text: "Explain you can't afford it right now and ask about payment plans",
+        outcome: "It's a harder conversation than you'd like, but the clinic works with you.",
+        effects: { happiness: -6, relationships: -4 },
       },
     ],
   },

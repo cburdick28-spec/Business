@@ -149,3 +149,10 @@ speed, prestige formula) are grouped near the top of
 `src/hooks/useGameLoop.js`, `src/data/upgrades.js`, and
 `src/data/managers.js` if you want to make the game faster/slower or
 easier/harder.
+
+Every run starts with a small seed of users/MRR (scaled by difficulty and
+business type) so passive income begins on tick one instead of requiring
+an upgrade purchase first, and any event choice with a
+`requirements.minCash` threshold (see `src/data/events.js`) is disabled in
+the UI and rejected by the reducer if you can't actually afford it — so a
+single event can no longer be the reason you go broke with no way out.

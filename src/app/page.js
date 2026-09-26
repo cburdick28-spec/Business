@@ -48,8 +48,13 @@ function createInitialState(options = {}) {
     pendingMergeBonus: 0,
     company: {
       cash: Math.round(5000 * difficultySettings.startingCashMultiplier * businessTypeSettings.startingCashMultiplier + startingCashBonus),
-      mrr: 0,
-      users: 0,
+      // A brand-new company with zero users/MRR produces mathematically zero
+      // passive income (both grow proportionally to `users`), so cash was a
+      // pure countdown until the player happened to buy an upgrade first.
+      // Seeding a small pre-existing user base (a garage MVP with early
+      // adopters) means income starts accruing from tick one.
+      mrr: Math.round(15 * difficultySettings.startingCashMultiplier * businessTypeSettings.startingCashMultiplier),
+      users: Math.round(25 * difficultySettings.startingCashMultiplier * businessTypeSettings.startingCashMultiplier),
       valuation: 0,
       quality: 50,
       morale: 60,
@@ -245,6 +250,9 @@ function reducer(state, action) {
       if (!event) return state;
       const choice = event.choices[choiceIndex];
       if (!choice) return state;
+      if (choice.requirements?.minCash !== undefined && state.company.cash < choice.requirements.minCash) {
+        return state;
+      }
 
       const withEffects = applyChoiceEffects(state, choice.effects);
 
@@ -511,7 +519,7 @@ export default function Page() {
         </div>
       </main>
 
-      <EventModal event={state.currentEvent} onChoose={handleChooseEvent} />
+      <EventModal event={state.currentEvent} cash={state.company.cash} onChoose={handleChooseEvent} />
       <Toast toasts={state.toasts} onDismiss={handleDismissToast} />
 
       {state.isGameOver && (

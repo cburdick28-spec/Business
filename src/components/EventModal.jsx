@@ -51,7 +51,7 @@ function EffectPreview({ effects }) {
   );
 }
 
-export default function EventModal({ event, onChoose }) {
+export default function EventModal({ event, cash = 0, onChoose }) {
   if (!event) return null;
 
   const style = TYPE_STYLES[event.type] || TYPE_STYLES.opportunity;
@@ -68,17 +68,36 @@ export default function EventModal({ event, onChoose }) {
         <p className="mt-2 text-sm leading-relaxed text-slate-300">{event.description}</p>
 
         <div className="mt-5 space-y-2">
-          {event.choices.map((choice, index) => (
-            <button
-              key={index}
-              type="button"
-              onClick={() => onChoose(index)}
-              className="w-full rounded-lg border border-panelborder bg-base px-4 py-2.5 text-left transition-colors hover:border-cyan-glow hover:bg-slate-800/70"
-            >
-              <span className="text-sm font-medium text-slate-100">{choice.text}</span>
-              <EffectPreview effects={choice.effects} />
-            </button>
-          ))}
+          {event.choices.map((choice, index) => {
+            // A choice can declare requirements.minCash so the player can't
+            // pick an option they can't actually afford — without this,
+            // flat cash-cost choices had no relationship to what the
+            // player actually had on hand and could drive cash arbitrarily
+            // negative with no way out.
+            const minCash = choice.requirements?.minCash;
+            const affordable = minCash === undefined || cash >= minCash;
+
+            return (
+              <button
+                key={index}
+                type="button"
+                disabled={!affordable}
+                onClick={() => affordable && onChoose(index)}
+                title={affordable ? undefined : "You can't afford this option right now"}
+                className={`w-full rounded-lg border px-4 py-2.5 text-left transition-colors ${
+                  affordable
+                    ? 'border-panelborder bg-base hover:border-cyan-glow hover:bg-slate-800/70'
+                    : 'cursor-not-allowed border-panelborder/50 bg-base/50 opacity-50'
+                }`}
+              >
+                <span className="text-sm font-medium text-slate-100">{choice.text}</span>
+                {!affordable && (
+                  <span className="ml-2 text-[10px] font-medium text-rose-300">Can&apos;t afford it</span>
+                )}
+                <EffectPreview effects={choice.effects} />
+              </button>
+            );
+          })}
         </div>
       </div>
     </div>
