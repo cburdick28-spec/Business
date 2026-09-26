@@ -24,8 +24,19 @@ LocalStorage.
   who automate parts of the business for you.
 - **Five company stages** — Garage → Startup → Scale-up → Unicorn →
   IPO-ready, each unlocking new events, upgrades, and managers.
+- **Six business types** — SaaS Startup, Mobile App Studio, E-Commerce
+  Brand, Creator Platform, Fintech, and Biotech, chosen on the Start
+  Screen. Each tunes its own growth speed, valuation ceiling, and decay
+  rate — some (Mobile Apps, E-Commerce) are easier and faster to run,
+  others (Fintech, Biotech) are harder but pay off bigger.
 - **Six endings** — Legendary Founder (IPO), Burned Out, Bankruptcy,
   Rich but Done (Acquisition), Rich but Alone, and Balanced Founder.
+- **New venture flow** — every ending offers three paths: start a fresh
+  business (pick a new type), **merge** your finished company into your
+  next venture (a cash-and-reputation seed-capital bonus carried forward),
+  or sell &amp; prestige for a permanent growth multiplier. Every completed
+  run is recorded in your Career &amp; Portfolio history (briefcase icon in
+  the top bar).
 - **Prestige system** — sell the company to reset your run with a
   permanent growth multiplier based on your final valuation.
 - **19 cross-run achievements** — permanent unlocks (viewable from the
@@ -84,19 +95,21 @@ founder-startup-life/
 │   │   ├── StatsPanel.jsx       # Health/Happiness/Relationships + Quality/Morale bars
 │   │   ├── EventLog.jsx         # Scrolling history of resolved events
 │   │   ├── Toast.jsx            # Milestone notifications
-│   │   ├── GameOverScreen.jsx   # Ending screen + prestige offer
-│   │   ├── StartScreen.jsx      # New run / continue run / difficulty select
+│   │   ├── GameOverScreen.jsx   # Ending screen: prestige / merge / fresh start
+│   │   ├── StartScreen.jsx      # Business type + difficulty select, new/continue
 │   │   ├── AchievementsPanel.jsx # Cross-run achievement list
+│   │   ├── PortfolioPanel.jsx   # Career stats + past-venture history
 │   │   └── SettingsModal.jsx    # Mute, difficulty display, reset save
 │   ├── hooks/
 │   │   ├── useGameLoop.js       # Idle income, decay, aging, ending checks (pure tick fn)
 │   │   ├── useEventEngine.js    # Randomized event spawning + choice resolution
 │   │   └── usePersistence.js    # LocalStorage load/autosave/clear
 │   ├── data/
-│   │   ├── events.js       # 77 fully-written events
-│   │   ├── upgrades.js     # 22 repeatable upgrades across 4 categories
-│   │   ├── managers.js     # 14 one-time-hire passive managers
-│   │   └── achievements.js # 19 permanent, cross-run achievement definitions
+│   │   ├── events.js         # 77 fully-written events
+│   │   ├── upgrades.js       # 22 repeatable upgrades across 4 categories
+│   │   ├── managers.js       # 14 one-time-hire passive managers
+│   │   ├── achievements.js   # 19 permanent, cross-run achievement definitions
+│   │   └── businessTypes.js  # 6 business types (growth/valuation/decay multipliers)
 │   └── utils/
 │       ├── audio.js        # Web Audio synth sound effects
 │       ├── math.js         # Formatting, scaling, valuation, stage helpers

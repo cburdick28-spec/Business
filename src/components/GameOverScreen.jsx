@@ -10,13 +10,22 @@ const TYPE_STYLES = {
   bittersweet: { border: 'border-fuchsia-400/50', glow: 'glow-magenta', text: 'text-fuchsia-300' },
 };
 
-export default function GameOverScreen({ endingId, company, personal, prestige, onNewRun, onPrestige }) {
+export default function GameOverScreen({
+  endingId,
+  company,
+  personal,
+  prestige,
+  onNewRun,
+  onMerge,
+  onPrestige,
+}) {
   const ending = getEnding(endingId);
   if (!ending) return null;
 
   const style = TYPE_STYLES[ending.type] || TYPE_STYLES.neutral;
   const canPrestige = ending.type === 'win' || endingId === 'ACQUISITION';
   const prestigeGain = Math.max(0, Math.log10(Math.max(company.valuation, 1)) - 4) * 0.15;
+  const mergeBonus = Math.round(company.cash * 0.25 + company.valuation * 0.015);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
@@ -55,22 +64,38 @@ export default function GameOverScreen({ endingId, company, personal, prestige, 
           </div>
         )}
 
-        <div className="mt-6 flex flex-col gap-2 sm:flex-row">
+        <div className="mt-4 rounded-lg border border-cyan-glow/30 bg-cyan-glow/5 p-4">
+          <p className="text-sm font-semibold text-cyan-300">Merge Into a New Venture</p>
+          <p className="mt-1 text-xs text-slate-400">
+            Fold this company's remaining cash and reputation into your next business — starting it
+            with <span className="font-semibold text-cyan-300">{formatCurrency(mergeBonus)}</span> in
+            extra seed capital. This venture joins your career portfolio either way.
+          </p>
+        </div>
+
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row">
           {canPrestige && (
             <button
               type="button"
               onClick={onPrestige}
               className="flex-1 rounded-lg bg-fuchsia-500/90 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-fuchsia-400"
             >
-              Sell the Company &amp; Prestige
+              Sell &amp; Prestige
             </button>
           )}
           <button
             type="button"
-            onClick={onNewRun}
-            className="flex-1 rounded-lg border border-panelborder bg-base px-4 py-2.5 text-sm font-semibold text-slate-100 transition-colors hover:border-cyan-glow hover:text-cyan-300"
+            onClick={onMerge}
+            className="flex-1 rounded-lg bg-cyan-glow/90 px-4 py-2.5 text-sm font-semibold text-slate-950 transition-colors hover:bg-cyan-300"
           >
-            Start New Run
+            Merge Into New Venture
+          </button>
+          <button
+            type="button"
+            onClick={onNewRun}
+            className="flex-1 rounded-lg border border-panelborder bg-base px-4 py-2.5 text-sm font-semibold text-slate-100 transition-colors hover:border-slate-500"
+          >
+            Start Fresh Business
           </button>
         </div>
       </div>

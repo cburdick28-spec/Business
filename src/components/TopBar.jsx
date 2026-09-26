@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { STAGES, animateCountUp, formatCurrency, formatCompactNumber } from '../utils/math';
+import { getBusinessType } from '../data/businessTypes';
 
 function AnimatedStat({ value, format }) {
   const [display, setDisplay] = useState(value);
@@ -39,9 +40,19 @@ function StatChip({ label, value, format, accent }) {
   );
 }
 
-export default function TopBar({ company, personal, muted, onToggleMute, onOpenAchievements, onOpenSettings }) {
+export default function TopBar({
+  company,
+  personal,
+  businessType,
+  muted,
+  onToggleMute,
+  onOpenAchievements,
+  onOpenPortfolio,
+  onOpenSettings,
+}) {
   const stageIndex = STAGES.findIndex((s) => s.id === company.stage);
   const stage = STAGES[stageIndex] || STAGES[0];
+  const businessTypeDef = getBusinessType(businessType);
 
   return (
     <header className="sticky top-0 z-30 border-b border-panelborder bg-panel/95 backdrop-blur">
@@ -60,9 +71,25 @@ export default function TopBar({ company, personal, muted, onToggleMute, onOpenA
         </div>
 
         <div className="flex items-center gap-2 py-1.5 pr-1 sm:pr-2">
+          <div
+            className="hidden items-center gap-1 rounded-full border border-panelborder bg-base px-3 py-1 text-xs font-medium text-slate-300 sm:flex"
+            title={businessTypeDef.tagline}
+          >
+            <span>{businessTypeDef.icon}</span>
+            {businessTypeDef.name}
+          </div>
           <div className="rounded-full border border-panelborder bg-base px-3 py-1 text-xs font-medium text-slate-300">
             Stage {stageIndex + 1}/5 &middot; <span className="text-fuchsia-300">{stage.label}</span>
           </div>
+          <button
+            type="button"
+            onClick={onOpenPortfolio}
+            className="rounded-full border border-panelborder bg-base px-2.5 py-1 text-xs text-slate-300 hover:border-fuchsia-400 hover:text-fuchsia-300 transition-colors"
+            aria-label="Career &amp; Portfolio"
+            title="Career &amp; Portfolio"
+          >
+            {'\u{1F4BC}'}
+          </button>
           <button
             type="button"
             onClick={onOpenAchievements}

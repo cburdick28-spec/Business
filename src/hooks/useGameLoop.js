@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { MANAGERS } from '../data/managers';
+import { getBusinessType } from '../data/businessTypes';
 import { checkAchievements } from '../data/achievements';
 import { checkEndingConditions } from '../utils/endings';
 import { clamp, computeValuation, getStageForValuation } from '../utils/math';
@@ -64,6 +65,7 @@ export function advanceGameState(state, deltaSeconds) {
   const isStruggling = state.personal.health < LOW_STAT_THRESHOLD || state.personal.happiness < LOW_STAT_THRESHOLD;
   const growthPenalty = isStruggling ? LOW_STAT_PENALTY : 1;
   const difficulty = DIFFICULTY_SETTINGS[state.difficulty] || DIFFICULTY_SETTINGS.normal;
+  const businessType = getBusinessType(state.businessType);
 
   // --- Company economics ---
   const qualityFactor = 0.4 + state.company.quality / 100;
@@ -73,7 +75,8 @@ export function advanceGameState(state, deltaSeconds) {
     qualityFactor *
     deltaSeconds *
     growthPenalty *
-    (1 + prestigeBonus);
+    (1 + prestigeBonus) *
+    businessType.mrrGrowthMultiplier;
   const nextMrrBase = Math.max(0, state.company.mrr + mrrGrowth);
   const effectiveMrr = nextMrrBase * (1 + mrrMultiplier);
 
@@ -91,32 +94,38 @@ export function advanceGameState(state, deltaSeconds) {
   const nextUsers = Math.max(0, state.company.users + organicUserGrowth + managerUserGrowth);
 
   const qualityDecay =
-    QUALITY_DECAY_PER_SEC * (1 - qualityDecayReduction) * deltaSeconds * difficulty.decayMultiplier;
+    QUALITY_DECAY_PER_SEC *
+    (1 - qualityDecayReduction) *
+    deltaSeconds *
+    difficulty.decayMultiplier *
+    businessType.decayMultiplier;
   const nextQuality = clamp(state.company.quality - qualityDecay, 0, 100);
 
   const moraleDrift =
     (MORALE_EQUILIBRIUM - state.company.morale) * MORALE_DRIFT_PER_SEC * deltaSeconds * 0.01;
   const nextMorale = clamp(state.company.morale + moraleDrift, 0, 100);
 
-  const nextValuation = computeValuation({
-    mrr: effectiveMrr,
-    users: nextUsers,
-    quality: nextQuality,
-    morale: nextMorale,
-  });
+  const nextValuation =
+    computeValuation({
+      mrr: effectiveMrr,
+      users: nextUsers,
+      quality: nextQuality,
+      morale: nextMorale,
+    }) * businessType.valuationMultiplier;
 
   const nextStage = getStageForValuation(nextValuation);
 
   // --- Personal stats ---
   const nextHealth = clamp(
     state.personal.health -
-      HEALTH_DECAY_PER_SEC * deltaSeconds * difficulty.decayMultiplier +
+      HEALTH_DECAY_PER_SEC * deltaSeconds * difficulty.decayMultiplier * businessType.decayMultiplier +
       autoHealthRegen * deltaSeconds,
     0,
     100
   );
   const nextHappiness = clamp(
-    state.personal.happiness - HAPPINESS_DECAY_PER_SEC * deltaSeconds * difficulty.decayMultiplier,
+    state.personal.happiness -
+      HAPPINESS_DECAY_PER_SEC * deltaSeconds * difficulty.decayMultiplier * businessType.decayMultiplier,
     0,
     100
   );

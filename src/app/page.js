@@ -14,36 +14,40 @@ import StartScreen from '../components/StartScreen';
 import AchievementsPanel from '../components/AchievementsPanel';
 import SettingsModal from '../components/SettingsModal';
 
+import PortfolioPanel from '../components/PortfolioPanel';
+
 import { UPGRADES } from '../data/upgrades';
 import { MANAGERS } from '../data/managers';
+import { getBusinessType } from '../data/businessTypes';
 import { useGameLoop, advanceGameState, DIFFICULTY_SETTINGS } from '../hooks/useGameLoop';
 import { useEventEngine, applyChoiceEffects, RECENT_EVENT_HISTORY_SIZE } from '../hooks/useEventEngine';
-import {
-  usePersistence,
-  loadSavedState,
-  saveStateToStorage,
-  clearSavedState,
-  hasSavedState,
-} from '../hooks/usePersistence';
+import { usePersistence, loadSavedState, clearSavedState } from '../hooks/usePersistence';
 import { sfx, setMuted, isMuted } from '../utils/audio';
 import { formatCurrency } from '../utils/math';
 
 function createInitialState(options = {}) {
   const {
     difficulty = 'normal',
+    businessType = 'saas',
     prestigeMultiplier = 0,
     prestigeMeta = {},
     stats = {},
     achievementsUnlocked = {},
+    portfolio = [],
+    startingCashBonus = 0,
   } = options;
 
   const difficultySettings = DIFFICULTY_SETTINGS[difficulty] || DIFFICULTY_SETTINGS.normal;
+  const businessTypeSettings = getBusinessType(businessType);
 
   return {
     hasStarted: false,
     difficulty,
+    businessType,
+    portfolio: [...portfolio],
+    pendingMergeBonus: 0,
     company: {
-      cash: Math.round(5000 * difficultySettings.startingCashMultiplier),
+      cash: Math.round(5000 * difficultySettings.startingCashMultiplier * businessTypeSettings.startingCashMultiplier + startingCashBonus),
       mrr: 0,
       users: 0,
       valuation: 0,
@@ -122,6 +126,53 @@ function reducer(state, action) {
 
     case 'START': {
       return { ...state, hasStarted: true };
+    }
+
+    // Merges lifetime meta (stats/achievements/prestige/portfolio) from a
+    // previously saved run into the current (not-yet-started) state, so the
+    // Start Screen can show accurate prestige/portfolio info before the
+    // player chooses to Continue or Start New.
+    case 'HYDRATE_META': {
+      const saved = action.payload || {};
+      return {
+        ...state,
+        stats: saved.stats || state.stats,
+        achievementsUnlocked: saved.achievementsUnlocked || state.achievementsUnlocked,
+        prestige: saved.prestige || state.prestige,
+        portfolio: saved.portfolio || state.portfolio,
+      };
+    }
+
+    // Returns to the Start Screen after an ending, without wiping the
+    // lifetime meta — used by "Start New Business", "Merge Into New
+    // Venture", and "Sell & Prestige", which each pass a different
+    // combination of portfolioEntry / mergeBonus / prestigeGain.
+    case 'RETURN_TO_START': {
+      const { portfolioEntry, mergeBonus = 0, prestigeGain = 0 } = action.payload || {};
+
+      const nextPrestige =
+        prestigeGain > 0
+          ? {
+              runs: state.prestige.runs + 1,
+              multiplier: state.prestige.multiplier + prestigeGain,
+              totalValuationEver: state.prestige.totalValuationEver + state.company.valuation,
+            }
+          : state.prestige;
+
+      const nextPortfolio = portfolioEntry
+        ? [...state.portfolio, portfolioEntry].slice(-12)
+        : state.portfolio;
+
+      return {
+        ...state,
+        hasStarted: false,
+        isGameOver: false,
+        endingId: null,
+        currentEvent: null,
+        pendingMergeBonus: mergeBonus,
+        portfolio: nextPortfolio,
+        prestige: nextPrestige,
+      };
     }
 
     case 'TICK': {
@@ -222,21 +273,6 @@ function reducer(state, action) {
       return { ...state, pendingSounds: [] };
     }
 
-    case 'PRESTIGE': {
-      const gain = Math.max(0, Math.log10(Math.max(state.company.valuation, 1)) - 4) * 0.15;
-      const nextMultiplier = state.prestige.multiplier + gain;
-      return createInitialState({
-        difficulty: state.difficulty,
-        prestigeMultiplier: nextMultiplier,
-        prestigeMeta: {
-          runs: state.prestige.runs + 1,
-          totalValuationEver: state.prestige.totalValuationEver + state.company.valuation,
-        },
-        stats: state.stats,
-        achievementsUnlocked: state.achievementsUnlocked,
-      });
-    }
-
     default:
       return state;
   }
@@ -247,23 +283,19 @@ export default function Page() {
   const [ready, setReady] = useState(false);
   const [savedAvailable, setSavedAvailable] = useState(false);
   const [muted, setMutedState] = useState(false);
-  const [homeScreenPrestige, setHomeScreenPrestige] = useState(0);
-  const [homeScreenCarry, setHomeScreenCarry] = useState({ stats: {}, achievementsUnlocked: {} });
   const [showAchievements, setShowAchievements] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showPortfolio, setShowPortfolio] = useState(false);
 
-  // On mount, check for a saved run and surface the start screen.
+  // On mount, check for a saved run and hydrate lifetime meta (stats,
+  // achievements, prestige, portfolio) into the current state so the Start
+  // Screen can show accurate info before the player chooses Continue or
+  // Start New — without auto-resuming the run itself.
   useEffect(() => {
-    setSavedAvailable(hasSavedState());
     const saved = loadSavedState();
-    if (saved?.prestige?.multiplier) {
-      setHomeScreenPrestige(saved.prestige.multiplier);
-    }
+    setSavedAvailable(Boolean(saved));
     if (saved) {
-      setHomeScreenCarry({
-        stats: saved.stats || {},
-        achievementsUnlocked: saved.achievementsUnlocked || {},
-      });
+      dispatch({ type: 'HYDRATE_META', payload: saved });
     }
     setMutedState(isMuted());
     setReady(true);
@@ -291,20 +323,24 @@ export default function Page() {
   }, []);
 
   const handleStartNew = useCallback(
-    (difficulty) => {
+    (difficulty, businessType) => {
       clearSavedState();
       dispatch({
         type: 'BEGIN_NEW_RUN',
         payload: {
           difficulty,
-          prestigeMultiplier: homeScreenPrestige,
-          stats: homeScreenCarry.stats,
-          achievementsUnlocked: homeScreenCarry.achievementsUnlocked,
+          businessType,
+          prestigeMultiplier: state.prestige.multiplier,
+          prestigeMeta: state.prestige,
+          stats: state.stats,
+          achievementsUnlocked: state.achievementsUnlocked,
+          portfolio: state.portfolio,
+          startingCashBonus: state.pendingMergeBonus || 0,
         },
       });
       dispatch({ type: 'START' });
     },
-    [homeScreenPrestige, homeScreenCarry]
+    [state]
   );
 
   const handleContinue = useCallback(() => {
@@ -332,29 +368,50 @@ export default function Page() {
     dispatch({ type: 'DISMISS_TOAST', payload: { toastId } });
   }, []);
 
+  // Builds the portfolio entry recorded whenever a run ends and the player
+  // moves on (whichever button they pick on the Game Over screen).
+  const buildPortfolioEntry = useCallback(
+    () => ({
+      id: `venture-${Date.now()}`,
+      businessType: state.businessType,
+      endingId: state.endingId,
+      finalValuation: state.company.valuation,
+      finalCash: state.company.cash,
+      ageReached: Math.floor(state.personal.age),
+    }),
+    [state]
+  );
+
   const handleNewRunAfterGameOver = useCallback(() => {
     clearSavedState();
     dispatch({
-      type: 'BEGIN_NEW_RUN',
-      payload: {
-        difficulty: state.difficulty,
-        prestigeMultiplier: state.prestige.multiplier,
-        prestigeMeta: state.prestige,
-        stats: state.stats,
-        achievementsUnlocked: state.achievementsUnlocked,
-      },
+      type: 'RETURN_TO_START',
+      payload: { portfolioEntry: buildPortfolioEntry() },
     });
-    dispatch({ type: 'START' });
-  }, [state]);
+  }, [buildPortfolioEntry]);
+
+  const handleMergeVenture = useCallback(() => {
+    clearSavedState();
+    const mergeBonus = Math.round(state.company.cash * 0.25 + state.company.valuation * 0.015);
+    dispatch({
+      type: 'RETURN_TO_START',
+      payload: { portfolioEntry: buildPortfolioEntry(), mergeBonus },
+    });
+  }, [state, buildPortfolioEntry]);
 
   const handlePrestige = useCallback(() => {
-    saveStateToStorage(state);
-    dispatch({ type: 'PRESTIGE' });
-    dispatch({ type: 'START' });
-  }, [state]);
+    clearSavedState();
+    const gain = Math.max(0, Math.log10(Math.max(state.company.valuation, 1)) - 4) * 0.15;
+    dispatch({
+      type: 'RETURN_TO_START',
+      payload: { portfolioEntry: buildPortfolioEntry(), prestigeGain: gain },
+    });
+  }, [state, buildPortfolioEntry]);
 
   const handleOpenAchievements = useCallback(() => setShowAchievements(true), []);
   const handleCloseAchievements = useCallback(() => setShowAchievements(false), []);
+  const handleOpenPortfolio = useCallback(() => setShowPortfolio(true), []);
+  const handleClosePortfolio = useCallback(() => setShowPortfolio(false), []);
   const handleOpenSettings = useCallback(() => setShowSettings(true), []);
   const handleCloseSettings = useCallback(() => setShowSettings(false), []);
 
@@ -362,8 +419,6 @@ export default function Page() {
     clearSavedState();
     setShowSettings(false);
     dispatch({ type: 'BEGIN_NEW_RUN', payload: {} });
-    setHomeScreenPrestige(0);
-    setHomeScreenCarry({ stats: {}, achievementsUnlocked: {} });
   }, []);
 
   if (!ready) {
@@ -374,7 +429,9 @@ export default function Page() {
     return (
       <StartScreen
         hasSave={savedAvailable}
-        prestigeMultiplier={homeScreenPrestige}
+        prestigeMultiplier={state.prestige.multiplier}
+        portfolio={state.portfolio}
+        mergeBonusCash={state.pendingMergeBonus}
         onStartNew={handleStartNew}
         onContinue={handleContinue}
       />
@@ -390,9 +447,11 @@ export default function Page() {
       <TopBar
         company={state.company}
         personal={state.personal}
+        businessType={state.businessType}
         muted={muted}
         onToggleMute={handleToggleMute}
         onOpenAchievements={handleOpenAchievements}
+        onOpenPortfolio={handleOpenPortfolio}
         onOpenSettings={handleOpenSettings}
       />
 
@@ -462,12 +521,22 @@ export default function Page() {
           personal={state.personal}
           prestige={state.prestige}
           onNewRun={handleNewRunAfterGameOver}
+          onMerge={handleMergeVenture}
           onPrestige={handlePrestige}
         />
       )}
 
       {showAchievements && (
         <AchievementsPanel unlocked={state.achievementsUnlocked} onClose={handleCloseAchievements} />
+      )}
+
+      {showPortfolio && (
+        <PortfolioPanel
+          stats={state.stats}
+          prestige={state.prestige}
+          portfolio={state.portfolio}
+          onClose={handleClosePortfolio}
+        />
       )}
 
       {showSettings && (
