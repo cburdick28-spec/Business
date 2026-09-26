@@ -1,6 +1,18 @@
 'use client';
 
+import { useState } from 'react';
+import { DIFFICULTY_SETTINGS } from '../hooks/useGameLoop';
+
+const DIFFICULTY_ORDER = ['easy', 'normal', 'hard'];
+const DIFFICULTY_BLURBS = {
+  easy: 'Slower decay, a bigger cash cushion. Good for exploring the story.',
+  normal: 'The intended experience. Balanced growth and grind.',
+  hard: 'Faster decay, thinner runway. For founders who want it to hurt.',
+};
+
 export default function StartScreen({ hasSave, prestigeMultiplier, onStartNew, onContinue }) {
+  const [difficulty, setDifficulty] = useState('normal');
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-base p-4">
       <div className="card glow-cyan w-full max-w-lg border-2 border-cyan-glow/30 p-6 sm:p-10 text-center">
@@ -21,7 +33,30 @@ export default function StartScreen({ hasSave, prestigeMultiplier, onStartNew, o
           </p>
         )}
 
-        <div className="mt-8 flex flex-col gap-2">
+        <div className="mt-6">
+          <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+            Difficulty
+          </p>
+          <div className="flex justify-center gap-2">
+            {DIFFICULTY_ORDER.map((id) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setDifficulty(id)}
+                className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                  difficulty === id
+                    ? 'border-cyan-glow bg-cyan-glow/10 text-cyan-300'
+                    : 'border-panelborder bg-base text-slate-400 hover:border-slate-600'
+                }`}
+              >
+                {DIFFICULTY_SETTINGS[id].label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-2 text-[11px] text-slate-500">{DIFFICULTY_BLURBS[difficulty]}</p>
+        </div>
+
+        <div className="mt-6 flex flex-col gap-2">
           {hasSave && (
             <button
               type="button"
@@ -33,7 +68,7 @@ export default function StartScreen({ hasSave, prestigeMultiplier, onStartNew, o
           )}
           <button
             type="button"
-            onClick={onStartNew}
+            onClick={() => onStartNew(difficulty)}
             className={`rounded-lg px-4 py-3 text-sm font-semibold transition-colors ${
               hasSave
                 ? 'border border-panelborder bg-base text-slate-200 hover:border-fuchsia-400 hover:text-fuchsia-300'

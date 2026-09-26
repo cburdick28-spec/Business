@@ -11,10 +11,12 @@ import EventModal from '../components/EventModal';
 import Toast from '../components/Toast';
 import GameOverScreen from '../components/GameOverScreen';
 import StartScreen from '../components/StartScreen';
+import AchievementsPanel from '../components/AchievementsPanel';
+import SettingsModal from '../components/SettingsModal';
 
 import { UPGRADES } from '../data/upgrades';
 import { MANAGERS } from '../data/managers';
-import { useGameLoop, advanceGameState } from '../hooks/useGameLoop';
+import { useGameLoop, advanceGameState, DIFFICULTY_SETTINGS } from '../hooks/useGameLoop';
 import { useEventEngine, applyChoiceEffects, RECENT_EVENT_HISTORY_SIZE } from '../hooks/useEventEngine';
 import {
   usePersistence,
@@ -26,11 +28,22 @@ import {
 import { sfx, setMuted, isMuted } from '../utils/audio';
 import { formatCurrency } from '../utils/math';
 
-function createInitialState(prestigeMultiplier = 0, prestigeMeta = {}) {
+function createInitialState(options = {}) {
+  const {
+    difficulty = 'normal',
+    prestigeMultiplier = 0,
+    prestigeMeta = {},
+    stats = {},
+    achievementsUnlocked = {},
+  } = options;
+
+  const difficultySettings = DIFFICULTY_SETTINGS[difficulty] || DIFFICULTY_SETTINGS.normal;
+
   return {
     hasStarted: false,
+    difficulty,
     company: {
-      cash: 5000,
+      cash: Math.round(5000 * difficultySettings.startingCashMultiplier),
       mrr: 0,
       users: 0,
       valuation: 0,
@@ -52,6 +65,15 @@ function createInitialState(prestigeMultiplier = 0, prestigeMeta = {}) {
       multiplier: prestigeMultiplier,
       totalValuationEver: prestigeMeta.totalValuationEver || 0,
     },
+    // Lifetime stats persist across resets/prestige — they drive achievements.
+    stats: {
+      totalEventsResolved: stats.totalEventsResolved || 0,
+      totalUpgradesBought: stats.totalUpgradesBought || 0,
+      totalManagersHired: stats.totalManagersHired || 0,
+      endingsReached: stats.endingsReached || [],
+      bestValuationEver: stats.bestValuationEver || 0,
+    },
+    achievementsUnlocked: { ...achievementsUnlocked },
     negativeCashSeconds: 0,
     eventLog: [],
     currentEvent: null,
@@ -95,7 +117,7 @@ function reducer(state, action) {
     }
 
     case 'BEGIN_NEW_RUN': {
-      return createInitialState(action.payload?.prestigeMultiplier || 0, action.payload?.prestigeMeta);
+      return createInitialState(action.payload || {});
     }
 
     case 'START': {
@@ -129,6 +151,7 @@ function reducer(state, action) {
         company,
         personal,
         upgrades: { ...state.upgrades, [upgradeId]: (state.upgrades[upgradeId] || 0) + 1 },
+        stats: { ...state.stats, totalUpgradesBought: state.stats.totalUpgradesBought + 1 },
         pendingSounds: [...state.pendingSounds, 'cashRegister'],
       };
     }
@@ -149,6 +172,7 @@ function reducer(state, action) {
         ...state,
         company,
         managers: { ...state.managers, [managerId]: true },
+        stats: { ...state.stats, totalManagersHired: state.stats.totalManagersHired + 1 },
         pendingSounds: [...state.pendingSounds, 'hire'],
       };
     }
@@ -184,6 +208,7 @@ function reducer(state, action) {
         ...withEffects,
         currentEvent: null,
         eventLog: [...state.eventLog, logEntry].slice(-40),
+        stats: { ...withEffects.stats, totalEventsResolved: withEffects.stats.totalEventsResolved + 1 },
         pendingSounds: [...withEffects.pendingSounds, soundForChoice(choice.effects)],
       };
     }
@@ -200,9 +225,15 @@ function reducer(state, action) {
     case 'PRESTIGE': {
       const gain = Math.max(0, Math.log10(Math.max(state.company.valuation, 1)) - 4) * 0.15;
       const nextMultiplier = state.prestige.multiplier + gain;
-      return createInitialState(nextMultiplier, {
-        runs: state.prestige.runs + 1,
-        totalValuationEver: state.prestige.totalValuationEver + state.company.valuation,
+      return createInitialState({
+        difficulty: state.difficulty,
+        prestigeMultiplier: nextMultiplier,
+        prestigeMeta: {
+          runs: state.prestige.runs + 1,
+          totalValuationEver: state.prestige.totalValuationEver + state.company.valuation,
+        },
+        stats: state.stats,
+        achievementsUnlocked: state.achievementsUnlocked,
       });
     }
 
@@ -217,6 +248,9 @@ export default function Page() {
   const [savedAvailable, setSavedAvailable] = useState(false);
   const [muted, setMutedState] = useState(false);
   const [homeScreenPrestige, setHomeScreenPrestige] = useState(0);
+  const [homeScreenCarry, setHomeScreenCarry] = useState({ stats: {}, achievementsUnlocked: {} });
+  const [showAchievements, setShowAchievements] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   // On mount, check for a saved run and surface the start screen.
   useEffect(() => {
@@ -224,6 +258,12 @@ export default function Page() {
     const saved = loadSavedState();
     if (saved?.prestige?.multiplier) {
       setHomeScreenPrestige(saved.prestige.multiplier);
+    }
+    if (saved) {
+      setHomeScreenCarry({
+        stats: saved.stats || {},
+        achievementsUnlocked: saved.achievementsUnlocked || {},
+      });
     }
     setMutedState(isMuted());
     setReady(true);
@@ -250,11 +290,22 @@ export default function Page() {
     });
   }, []);
 
-  const handleStartNew = useCallback(() => {
-    clearSavedState();
-    dispatch({ type: 'BEGIN_NEW_RUN', payload: { prestigeMultiplier: homeScreenPrestige } });
-    dispatch({ type: 'START' });
-  }, [homeScreenPrestige]);
+  const handleStartNew = useCallback(
+    (difficulty) => {
+      clearSavedState();
+      dispatch({
+        type: 'BEGIN_NEW_RUN',
+        payload: {
+          difficulty,
+          prestigeMultiplier: homeScreenPrestige,
+          stats: homeScreenCarry.stats,
+          achievementsUnlocked: homeScreenCarry.achievementsUnlocked,
+        },
+      });
+      dispatch({ type: 'START' });
+    },
+    [homeScreenPrestige, homeScreenCarry]
+  );
 
   const handleContinue = useCallback(() => {
     const saved = loadSavedState();
@@ -283,15 +334,37 @@ export default function Page() {
 
   const handleNewRunAfterGameOver = useCallback(() => {
     clearSavedState();
-    dispatch({ type: 'BEGIN_NEW_RUN', payload: { prestigeMultiplier: state.prestige.multiplier } });
+    dispatch({
+      type: 'BEGIN_NEW_RUN',
+      payload: {
+        difficulty: state.difficulty,
+        prestigeMultiplier: state.prestige.multiplier,
+        prestigeMeta: state.prestige,
+        stats: state.stats,
+        achievementsUnlocked: state.achievementsUnlocked,
+      },
+    });
     dispatch({ type: 'START' });
-  }, [state.prestige.multiplier]);
+  }, [state]);
 
   const handlePrestige = useCallback(() => {
     saveStateToStorage(state);
     dispatch({ type: 'PRESTIGE' });
     dispatch({ type: 'START' });
   }, [state]);
+
+  const handleOpenAchievements = useCallback(() => setShowAchievements(true), []);
+  const handleCloseAchievements = useCallback(() => setShowAchievements(false), []);
+  const handleOpenSettings = useCallback(() => setShowSettings(true), []);
+  const handleCloseSettings = useCallback(() => setShowSettings(false), []);
+
+  const handleResetSave = useCallback(() => {
+    clearSavedState();
+    setShowSettings(false);
+    dispatch({ type: 'BEGIN_NEW_RUN', payload: {} });
+    setHomeScreenPrestige(0);
+    setHomeScreenCarry({ stats: {}, achievementsUnlocked: {} });
+  }, []);
 
   if (!ready) {
     return <div className="flex h-screen items-center justify-center bg-base text-slate-500">Loading…</div>;
@@ -319,6 +392,8 @@ export default function Page() {
         personal={state.personal}
         muted={muted}
         onToggleMute={handleToggleMute}
+        onOpenAchievements={handleOpenAchievements}
+        onOpenSettings={handleOpenSettings}
       />
 
       <main className="mx-auto grid max-w-[1600px] grid-cols-1 gap-4 p-3 sm:p-4 lg:grid-cols-[280px_minmax(0,1fr)_300px]">
@@ -388,6 +463,20 @@ export default function Page() {
           prestige={state.prestige}
           onNewRun={handleNewRunAfterGameOver}
           onPrestige={handlePrestige}
+        />
+      )}
+
+      {showAchievements && (
+        <AchievementsPanel unlocked={state.achievementsUnlocked} onClose={handleCloseAchievements} />
+      )}
+
+      {showSettings && (
+        <SettingsModal
+          muted={muted}
+          difficulty={state.difficulty}
+          onToggleMute={handleToggleMute}
+          onResetSave={handleResetSave}
+          onClose={handleCloseSettings}
         />
       )}
     </div>

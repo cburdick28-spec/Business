@@ -159,6 +159,13 @@ export const sfx = {
     sweep({ from: 300, to: 60, type: 'sine', duration: 0.9, peak: 0.2 });
   },
 
+  // Bright, distinct sting for a permanent achievement unlock.
+  achievementUnlock() {
+    tone({ freq: 784, type: 'triangle', duration: 0.1, peak: 0.16 });
+    tone({ freq: 987.77, type: 'triangle', duration: 0.1, peak: 0.16, delay: 0.08 });
+    tone({ freq: 1174.66, type: 'sine', duration: 0.28, peak: 0.2, delay: 0.16 });
+  },
+
   // Gentle tick for prestige / sale confirmation.
   prestigeChime() {
     tone({ freq: 880, type: 'sine', duration: 0.1, peak: 0.15 });

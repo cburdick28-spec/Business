@@ -15,22 +15,31 @@ LocalStorage.
   and Employee Morale on the company side; Health, Happiness,
   Relationships, Reputation, and Age on the personal side. Let Health or
   Happiness drop below 30 and your company's growth rate is cut in half.
-- **52 handwritten events** — crises, investor offers, employee issues,
+- **77 handwritten events** — crises, investor offers, employee issues,
   personal-life moments, health scares, viral moments, legal trouble,
   competitor moves, and relationship events, spawning every 8-15 seconds
   and filtered by your current company stage, age, and stats.
 - **Idle income layer** — users generate revenue passively; spend cash on
-  servers, marketing, product, and office upgrades, or hire managers who
-  automate parts of the business for you.
+  22 servers/marketing/product/office upgrades, or hire from 14 managers
+  who automate parts of the business for you.
 - **Five company stages** — Garage → Startup → Scale-up → Unicorn →
   IPO-ready, each unlocking new events, upgrades, and managers.
 - **Six endings** — Legendary Founder (IPO), Burned Out, Bankruptcy,
   Rich but Done (Acquisition), Rich but Alone, and Balanced Founder.
 - **Prestige system** — sell the company to reset your run with a
   permanent growth multiplier based on your final valuation.
+- **19 cross-run achievements** — permanent unlocks (viewable from the
+  trophy icon in the top bar) tracking lifetime stats: events resolved,
+  upgrades bought, managers hired, endings seen, and more. These persist
+  across resets and prestige runs.
+- **Three difficulty modes** — Easy, Normal, and Hard, chosen on the Start
+  Screen, tuning starting cash and how fast personal/company stats decay.
+- **Settings menu** — mute toggle, current difficulty, and a reset-save
+  option, from the gear icon in the top bar.
 - **Fully procedural audio** — every sound effect (event blips, revenue
-  chimes, crisis buzzers, cash registers, fanfares) is synthesized live
-  with the Web Audio API. No audio files anywhere in the repo.
+  chimes, crisis buzzers, cash registers, fanfares, achievement stings) is
+  synthesized live with the Web Audio API. No audio files anywhere in the
+  repo.
 - **Auto-save** — your run is saved to LocalStorage every 10 seconds and
   restored automatically when you come back.
 
@@ -76,15 +85,18 @@ founder-startup-life/
 │   │   ├── EventLog.jsx         # Scrolling history of resolved events
 │   │   ├── Toast.jsx            # Milestone notifications
 │   │   ├── GameOverScreen.jsx   # Ending screen + prestige offer
-│   │   └── StartScreen.jsx      # New run / continue run
+│   │   ├── StartScreen.jsx      # New run / continue run / difficulty select
+│   │   ├── AchievementsPanel.jsx # Cross-run achievement list
+│   │   └── SettingsModal.jsx    # Mute, difficulty display, reset save
 │   ├── hooks/
 │   │   ├── useGameLoop.js       # Idle income, decay, aging, ending checks (pure tick fn)
 │   │   ├── useEventEngine.js    # Randomized event spawning + choice resolution
 │   │   └── usePersistence.js    # LocalStorage load/autosave/clear
 │   ├── data/
-│   │   ├── events.js       # 52 fully-written events
-│   │   ├── upgrades.js     # 16 repeatable upgrades across 4 categories
-│   │   └── managers.js     # 10 one-time-hire passive managers
+│   │   ├── events.js       # 77 fully-written events
+│   │   ├── upgrades.js     # 22 repeatable upgrades across 4 categories
+│   │   ├── managers.js     # 14 one-time-hire passive managers
+│   │   └── achievements.js # 19 permanent, cross-run achievement definitions
 │   └── utils/
 │       ├── audio.js        # Web Audio synth sound effects
 │       ├── math.js         # Formatting, scaling, valuation, stage helpers

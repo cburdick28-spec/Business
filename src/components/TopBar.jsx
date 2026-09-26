@@ -39,7 +39,7 @@ function StatChip({ label, value, format, accent }) {
   );
 }
 
-export default function TopBar({ company, personal, muted, onToggleMute }) {
+export default function TopBar({ company, personal, muted, onToggleMute, onOpenAchievements, onOpenSettings }) {
   const stageIndex = STAGES.findIndex((s) => s.id === company.stage);
   const stage = STAGES[stageIndex] || STAGES[0];
 
@@ -65,12 +65,30 @@ export default function TopBar({ company, personal, muted, onToggleMute }) {
           </div>
           <button
             type="button"
+            onClick={onOpenAchievements}
+            className="rounded-full border border-panelborder bg-base px-2.5 py-1 text-xs text-slate-300 hover:border-lime-glow hover:text-lime-glow transition-colors"
+            aria-label="Achievements"
+            title="Achievements"
+          >
+            {'\u{1F3C6}'}
+          </button>
+          <button
+            type="button"
             onClick={onToggleMute}
             className="rounded-full border border-panelborder bg-base px-2.5 py-1 text-xs text-slate-300 hover:border-cyan-glow hover:text-cyan-300 transition-colors"
             aria-label={muted ? 'Unmute sound' : 'Mute sound'}
             title={muted ? 'Unmute sound' : 'Mute sound'}
           >
             {muted ? '\u{1F507}' : '\u{1F50A}'}
+          </button>
+          <button
+            type="button"
+            onClick={onOpenSettings}
+            className="rounded-full border border-panelborder bg-base px-2.5 py-1 text-xs text-slate-300 hover:border-cyan-glow hover:text-cyan-300 transition-colors"
+            aria-label="Settings"
+            title="Settings"
+          >
+            {'⚙️'}
           </button>
         </div>
       </div>

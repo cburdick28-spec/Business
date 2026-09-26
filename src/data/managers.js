@@ -105,6 +105,44 @@ export const MANAGERS = [
     stages: ['ipo'],
     effects: { userGrowthPerSec: 3, mrrMultiplier: 0.15 },
   },
+
+  // --- Expansion pack ---
+  {
+    id: 'customer-success-lead',
+    name: 'Amara Osei',
+    title: 'Head of Customer Success',
+    description: 'Keeps churn down by catching unhappy customers before they leave.',
+    cost: 30000,
+    stages: ['startup', 'scaleup'],
+    effects: { mrrMultiplier: 0.05, userGrowthPerSec: 0.3 },
+  },
+  {
+    id: 'data-science-lead',
+    name: 'Ravi Malhotra',
+    title: 'Head of Data Science',
+    description: 'Turns raw usage data into product decisions that actually land.',
+    cost: 90000,
+    stages: ['scaleup', 'unicorn'],
+    effects: { qualityDecayReduction: 0.3, mrrMultiplier: 0.04 },
+  },
+  {
+    id: 'executive-assistant',
+    name: 'Lena Brandt',
+    title: 'Executive Assistant',
+    description: 'Keeps your calendar sane and your inbox from swallowing you whole.',
+    cost: 45000,
+    stages: ['startup', 'scaleup', 'unicorn'],
+    effects: { autoHealthRegen: 0.08, moraleFlat: 3 },
+  },
+  {
+    id: 'communications-director',
+    name: 'Isabelle Moreau',
+    title: 'Director of Communications',
+    description: 'Manages the narrative so a bad news day stays a bad news day, not a crisis.',
+    cost: 500000,
+    stages: ['unicorn', 'ipo'],
+    effects: { mrrMultiplier: 0.05, moraleFlat: 4 },
+  },
 ];
 
 export function getAvailableManagers(stageId) {

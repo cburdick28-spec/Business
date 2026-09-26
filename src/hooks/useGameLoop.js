@@ -2,8 +2,17 @@
 
 import { useEffect, useRef } from 'react';
 import { MANAGERS } from '../data/managers';
+import { checkAchievements } from '../data/achievements';
 import { checkEndingConditions } from '../utils/endings';
 import { clamp, computeValuation, getStageForValuation } from '../utils/math';
+
+// Difficulty affects starting cash and how quickly personal/company stats
+// decay. Selected once on the Start Screen and stored on state.difficulty.
+export const DIFFICULTY_SETTINGS = {
+  easy: { label: 'Easy', decayMultiplier: 0.6, startingCashMultiplier: 1.6 },
+  normal: { label: 'Normal', decayMultiplier: 1, startingCashMultiplier: 1 },
+  hard: { label: 'Hard', decayMultiplier: 1.5, startingCashMultiplier: 0.6 },
+};
 
 // Tuning constants for the idle-income and decay layers. These are
 // deliberately game-y rather than economically realistic — the goal is a
@@ -54,6 +63,7 @@ export function advanceGameState(state, deltaSeconds) {
 
   const isStruggling = state.personal.health < LOW_STAT_THRESHOLD || state.personal.happiness < LOW_STAT_THRESHOLD;
   const growthPenalty = isStruggling ? LOW_STAT_PENALTY : 1;
+  const difficulty = DIFFICULTY_SETTINGS[state.difficulty] || DIFFICULTY_SETTINGS.normal;
 
   // --- Company economics ---
   const qualityFactor = 0.4 + state.company.quality / 100;
@@ -80,7 +90,8 @@ export function advanceGameState(state, deltaSeconds) {
   const managerUserGrowth = userGrowthPerSec * deltaSeconds;
   const nextUsers = Math.max(0, state.company.users + organicUserGrowth + managerUserGrowth);
 
-  const qualityDecay = QUALITY_DECAY_PER_SEC * (1 - qualityDecayReduction) * deltaSeconds;
+  const qualityDecay =
+    QUALITY_DECAY_PER_SEC * (1 - qualityDecayReduction) * deltaSeconds * difficulty.decayMultiplier;
   const nextQuality = clamp(state.company.quality - qualityDecay, 0, 100);
 
   const moraleDrift =
@@ -98,11 +109,17 @@ export function advanceGameState(state, deltaSeconds) {
 
   // --- Personal stats ---
   const nextHealth = clamp(
-    state.personal.health - HEALTH_DECAY_PER_SEC * deltaSeconds + autoHealthRegen * deltaSeconds,
+    state.personal.health -
+      HEALTH_DECAY_PER_SEC * deltaSeconds * difficulty.decayMultiplier +
+      autoHealthRegen * deltaSeconds,
     0,
     100
   );
-  const nextHappiness = clamp(state.personal.happiness - HAPPINESS_DECAY_PER_SEC * deltaSeconds, 0, 100);
+  const nextHappiness = clamp(
+    state.personal.happiness - HAPPINESS_DECAY_PER_SEC * deltaSeconds * difficulty.decayMultiplier,
+    0,
+    100
+  );
   const nextAge = state.personal.age + deltaSeconds / AGE_SECONDS_PER_YEAR;
 
   // --- Negative cash tracking (bankruptcy timer) ---
@@ -154,17 +171,46 @@ export function advanceGameState(state, deltaSeconds) {
     };
   }
 
+  // --- Lifetime stats (persist across resets/prestige) ---
+  const bestValuationEver = Math.max(nextState.stats.bestValuationEver, nextState.company.valuation);
+  if (bestValuationEver !== nextState.stats.bestValuationEver) {
+    nextState = { ...nextState, stats: { ...nextState.stats, bestValuationEver } };
+  }
+
   // --- Endings ---
   const endingId = checkEndingConditions(nextState);
   if (endingId) {
+    const endingsReached = nextState.stats.endingsReached.includes(endingId)
+      ? nextState.stats.endingsReached
+      : [...nextState.stats.endingsReached, endingId];
+
     nextState = {
       ...nextState,
       isGameOver: true,
       endingId,
+      stats: { ...nextState.stats, endingsReached },
       pendingSounds: [
         ...nextState.pendingSounds,
         endingId === 'IPO' || endingId === 'BALANCED' ? 'victoryFanfare' : 'gameOverTone',
       ],
+    };
+  }
+
+  // --- Achievements (permanent, cross-run unlocks) ---
+  const { unlocked, newlyUnlocked } = checkAchievements(nextState);
+  if (newlyUnlocked.length > 0) {
+    nextState = {
+      ...nextState,
+      achievementsUnlocked: unlocked,
+      toasts: [
+        ...nextState.toasts,
+        ...newlyUnlocked.map((a) => ({
+          id: `achievement-${a.id}-${Date.now()}`,
+          message: `Achievement unlocked: ${a.title}`,
+          tone: 'milestone',
+        })),
+      ],
+      pendingSounds: [...nextState.pendingSounds, 'achievementUnlock'],
     };
   }
 
